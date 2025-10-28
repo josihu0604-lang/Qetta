@@ -8,7 +8,7 @@ import { healthRoutes } from './routes/health';
 import { oauthRoutes } from './routes/oauth';
 import idempotency from './plugins/idempotency';
 import metrics from './plugins/metrics';
-import { logger } from '@qetta/shared';
+import { logger } from '@hephaitos/shared';
 
 /**
  * Create Fastify app instance

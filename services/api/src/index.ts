@@ -2,7 +2,7 @@ import { buildApp } from './app';
 import { env, validateEnv } from './config/env';
 import { connectDatabase, disconnectDatabase } from './config/database';
 import { redis } from './config/redis';
-import { logger } from '@qetta/shared';
+import { logger } from '@hephaitos/shared';
 
 /**
  * Start the server

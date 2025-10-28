@@ -1,5 +1,5 @@
 {
-  "name": "@qetta/web",
+  "name": "@hephaitos/web",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@headlessui/react": "^2.2.6",
-    "@qetta/shared": "workspace:*",
+    "@hephaitos/shared": "workspace:*",
     "@tanstack/react-query": "^5.62.7",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

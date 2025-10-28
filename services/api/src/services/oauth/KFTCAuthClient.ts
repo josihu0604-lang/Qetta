@@ -1,5 +1,5 @@
 import { env } from '../../config/env';
-import { logger } from '@qetta/shared';
+import { logger } from '@hephaitos/shared';
 
 /**
  * KFTC OpenBanking OAuth 클라이언트
