@@ -1,21 +1,14 @@
-import { CallToAction } from '@/components/CallToAction'
-import { Faqs } from '@/components/Faqs'
-import { Hero } from '@/components/Hero'
-import { Pricing } from '@/components/Pricing'
-import { PrimaryFeatures } from '@/components/PrimaryFeatures'
-import { Reviews } from '@/components/Reviews'
-import { SecondaryFeatures } from '@/components/SecondaryFeatures'
+/**
+ * Mobile Home Page - Redirects to Dashboard
+ * 
+ * Phase 3: Core mobile pages are now the primary experience.
+ * Landing page components (Hero, Features, etc.) are preserved for marketing.
+ */
+
+import { redirect } from 'next/navigation';
 
 export default function Home() {
-  return (
-    <>
-      <Hero />
-      <PrimaryFeatures />
-      <SecondaryFeatures />
-      <CallToAction />
-      <Reviews />
-      <Pricing />
-      <Faqs />
-    </>
-  )
+  // Redirect authenticated users to dashboard
+  // TODO: Add authentication check when auth is implemented
+  redirect('/dashboard');
 }
