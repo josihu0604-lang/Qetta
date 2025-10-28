@@ -12,11 +12,41 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    template: '%s - Pocket',
-    default: 'Pocket - Invest at the perfect time.',
+    template: '%s - Hephaitos',
+    default: 'Hephaitos - 스마트 금융 관리',
   },
   description:
-    'By leveraging insights from our network of industry insiders, you’ll know exactly when to buy to maximize profit, and exactly when to sell to avoid painful losses.',
+    'AI 기반 맞춤형 금융 관리 및 정책 추천 서비스. 부채 분석, 계좌 통합, 정부 지원 정책 추천을 한 곳에서.',
+  keywords: ['금융관리', '부채분석', '정책추천', 'AI금융', '자산관리', '대출관리'],
+  authors: [{ name: 'Hephaitos Team' }],
+  creator: 'Hephaitos',
+  publisher: 'Hephaitos',
+  applicationName: 'Hephaitos',
+  manifest: '/manifest.json',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#3b82f6' },
+    { media: '(prefers-color-scheme: dark)', color: '#2563eb' },
+  ],
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 5,
+    userScalable: true,
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Hephaitos',
+  },
+  icons: {
+    icon: [
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+    ],
+  },
 }
 
 export default function RootLayout({
@@ -25,7 +55,14 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" className={clsx('bg-gray-50 antialiased', inter.variable)}>
+    <html lang="ko" className={clsx('bg-gray-50 antialiased', inter.variable)}>
+      <head>
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="Hephaitos" />
+      </head>
       <body>{children}</body>
     </html>
   )
