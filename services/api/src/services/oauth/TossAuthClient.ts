@@ -1,5 +1,5 @@
 import { env } from '../../config/env';
-import { logger } from '@qetta/shared';
+import { logger } from '@hephaitos/shared';
 
 /**
  * Toss 인증 API 클라이언트

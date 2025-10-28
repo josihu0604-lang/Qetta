@@ -1,6 +1,6 @@
 import Redis from 'ioredis';
 import { env } from './env';
-import { logger } from '@qetta/shared';
+import { logger } from '@hephaitos/shared';
 
 /**
  * Redis client instance

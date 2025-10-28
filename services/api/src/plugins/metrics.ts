@@ -1,7 +1,7 @@
 import fp from 'fastify-plugin';
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import client from 'prom-client';
-import { logger } from '@qetta/shared';
+import { logger } from '@hephaitos/shared';
 
 /**
  * Prometheus Metrics 플러그인

@@ -3,7 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { createHash } from 'crypto';
 import { redis } from '../config/redis';
 import { env } from '../config/env';
-import { logger } from '@qetta/shared';
+import { logger } from '@hephaitos/shared';
 
 /**
  * Idempotency 미들웨어

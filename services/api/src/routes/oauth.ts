@@ -3,8 +3,8 @@ import { TossAuthClient } from '../services/oauth/TossAuthClient';
 import { KFTCAuthClient } from '../services/oauth/KFTCAuthClient';
 import { prisma } from '../config/database';
 import { cache } from '../config/redis';
-import { encrypt } from '@qetta/shared';
-import { logger } from '@qetta/shared';
+import { encrypt } from '@hephaitos/shared';
+import { logger } from '@hephaitos/shared';
 import crypto from 'crypto';
 
 /**
