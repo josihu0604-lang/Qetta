@@ -1,4 +1,4 @@
-import { type Metadata } from 'next'
+import { type Metadata, type Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import clsx from 'clsx'
 
@@ -9,6 +9,18 @@ const inter = Inter({
   display: 'swap',
   variable: '--font-inter',
 })
+
+// Next.js 15: Separate viewport export
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  userScalable: true,
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#3b82f6' },
+    { media: '(prefers-color-scheme: dark)', color: '#2563eb' },
+  ],
+}
 
 export const metadata: Metadata = {
   title: {
@@ -23,16 +35,6 @@ export const metadata: Metadata = {
   publisher: 'Hephaitos',
   applicationName: 'Hephaitos',
   manifest: '/manifest.json',
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#3b82f6' },
-    { media: '(prefers-color-scheme: dark)', color: '#2563eb' },
-  ],
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 5,
-    userScalable: true,
-  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
