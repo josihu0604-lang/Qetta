@@ -1,0 +1,164 @@
+name: Security Gates
+
+on:
+  push:
+    branches: [main, develop, master]
+  pull_request:
+    branches: [main, develop, master]
+
+jobs:
+  gitleaks:
+    name: Gitleaks Secret Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        with:
+          args: --no-banner -v
+
+  trufflehog:
+    name: TruffleHog Secret Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run TruffleHog
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --fail-verified --only-verified
+
+  dependency-check:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run npm audit
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
+      - name: Run npm audit fix (dry-run)
+        run: npm audit fix --dry-run
+
+  prisma-security:
+    name: Prisma Schema Security Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate Prisma schema
+        working-directory: ./services/api
+        run: npx prisma validate
+
+      - name: Check for sensitive data in schema
+        working-directory: ./services/api
+        run: |
+          # Check for common sensitive field names without @db.Text or encryption notes
+          if grep -E 'password|secret|key|token' prisma/schema.prisma | grep -v '@db.Text' | grep -v '// Encrypted'; then
+            echo "⚠️  Warning: Potential sensitive fields without encryption markers found"
+            exit 1
+          fi
+
+  env-check:
+    name: Environment Variable Security Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check for hardcoded secrets in .env.example
+        run: |
+          # Check if .env.example contains actual secrets (not placeholder values)
+          if grep -rE '(sk_live|pk_live|api_key_[a-zA-Z0-9]{32})' . --include=".env.example"; then
+            echo "❌ ERROR: Real secrets found in .env.example files!"
+            exit 1
+          fi
+          echo "✅ No hardcoded secrets detected in .env.example files"
+
+      - name: Check for committed .env files
+        run: |
+          if find . -name ".env" -not -path "*/node_modules/*" -not -name ".env.example" | grep .; then
+            echo "❌ ERROR: .env files should not be committed!"
+            exit 1
+          fi
+          echo "✅ No .env files committed"
+
+  docker-security:
+    name: Docker Security Scan
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy security scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  security-summary:
+    name: Security Summary
+    runs-on: ubuntu-latest
+    needs: [gitleaks, trufflehog, dependency-check, prisma-security, env-check]
+    if: always()
+    steps:
+      - name: Check all security gates
+        run: |
+          echo "🔒 Security Gates Summary:"
+          echo "=========================="
+          echo "✅ Gitleaks: ${{ needs.gitleaks.result }}"
+          echo "✅ TruffleHog: ${{ needs.trufflehog.result }}"
+          echo "✅ Dependency Check: ${{ needs.dependency-check.result }}"
+          echo "✅ Prisma Security: ${{ needs.prisma-security.result }}"
+          echo "✅ Env Check: ${{ needs.env-check.result }}"
+          
+          if [[ "${{ needs.gitleaks.result }}" == "failure" ]] || \
+             [[ "${{ needs.trufflehog.result }}" == "failure" ]] || \
+             [[ "${{ needs.prisma-security.result }}" == "failure" ]] || \
+             [[ "${{ needs.env-check.result }}" == "failure" ]]; then
+            echo "❌ Security gates failed! Please review the errors above."
+            exit 1
+          fi
+          
+          echo "✅ All security gates passed!"
