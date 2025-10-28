@@ -106,10 +106,10 @@ export async function buildApp() {
    * Register routes
    */
   await app.register(healthRoutes, { prefix: env.API_BASE_PATH });
+  await app.register(oauthRoutes, { prefix: `${env.API_BASE_PATH}/oauth` });
 
   // TODO: Add more routes here
   // await app.register(authRoutes, { prefix: `${env.API_BASE_PATH}/auth` });
-  // await app.register(oauthRoutes, { prefix: `${env.API_BASE_PATH}/oauth` });
   // await app.register(accountRoutes, { prefix: `${env.API_BASE_PATH}/accounts` });
   // ... etc
 
