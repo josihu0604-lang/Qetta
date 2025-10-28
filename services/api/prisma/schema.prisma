@@ -228,3 +228,47 @@ model Application {
   @@index([idempotencyKey])
   @@map("applications")
 }
+
+// ========================================
+// Audit & Decision Log Models (11모델 완성)
+// ========================================
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?  @map("user_id") // nullable for system actions
+  action    String   // 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'OAUTH_CONNECT' | 'PDF_GENERATE'
+  resource  String   // 'User' | 'OAuthConnection' | 'Application' | 'DebtAnalysis'
+  resourceId String? @map("resource_id")
+  details   Json?    // Additional context (before/after values)
+  ip        String?  // Client IP address
+  userAgent String?  @map("user_agent") @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, action, createdAt(sort: Desc)])
+  @@index([resource, resourceId])
+  @@index([createdAt(sort: Desc)])
+  @@map("audit_logs")
+}
+
+model DecisionLog {
+  id         String   @id @default(cuid())
+  userId     String?  @map("user_id") // nullable for system decisions
+  actor      String   // 'user' | 'system' | 'ai_agent' | 'admin'
+  decision   String   // 'APPROVE_APPLICATION' | 'REJECT_LOAN' | 'RECOMMEND_POLICY'
+  request    Json     // Input data for the decision
+  context    Json?    // Additional context (DTI, DSR, credit grade, etc.)
+  tools      Json?    // Tools/APIs used in decision making
+  citations  Json?    // Reference sources (policy documents, regulations)
+  risks      Json?    // Identified risks and mitigation
+  outcome    Json     // Decision result and reasoning
+  confidence Float?   // Confidence score (0-1)
+  reviewedBy String?  @map("reviewed_by") // Admin who reviewed the decision
+  reviewedAt DateTime? @map("reviewed_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([userId, decision, createdAt(sort: Desc)])
+  @@index([actor, createdAt(sort: Desc)])
+  @@index([decision])
+  @@index([createdAt(sort: Desc)])
+  @@map("decision_logs")
+}

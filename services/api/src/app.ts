@@ -5,6 +5,9 @@ import rateLimit from '@fastify/rate-limit';
 import { env } from './config/env';
 import { redis } from './config/redis';
 import { healthRoutes } from './routes/health';
+import { oauthRoutes } from './routes/oauth';
+import idempotency from './plugins/idempotency';
+import metrics from './plugins/metrics';
 import { logger } from '@qetta/shared';
 
 /**
@@ -19,6 +22,12 @@ export async function buildApp() {
   /**
    * Register plugins
    */
+
+  // Metrics (먼저 등록하여 모든 요청 추적)
+  await app.register(metrics);
+
+  // Idempotency (POST/PUT/PATCH/DELETE 중복 방지)
+  await app.register(idempotency);
 
   // CORS
   await app.register(cors, {
