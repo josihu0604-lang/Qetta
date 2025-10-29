@@ -49,7 +49,11 @@ export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200 bg-white shadow-lg dark:border-gray-800 dark:bg-gray-900">
+    <nav 
+      className="fixed bottom-0 left-0 right-0 z-50 border-t border-gray-200 bg-white/95 shadow-lg backdrop-blur-md dark:border-gray-800 dark:bg-gray-900/95"
+      role="navigation"
+      aria-label="Main navigation"
+    >
       <div className="mx-auto flex max-w-lg items-center justify-around">
         {navItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
@@ -59,24 +63,50 @@ export function BottomNav() {
               key={item.href}
               href={item.href}
               className={clsx(
-                'flex flex-1 flex-col items-center justify-center py-2 text-center transition-colors',
-                'min-h-[56px] active:bg-gray-100 dark:active:bg-gray-800',
+                'group relative flex flex-1 flex-col items-center justify-center py-2 text-center transition-all duration-200',
+                'min-h-[60px] active:scale-95',
                 isActive
-                  ? 'text-primary-600 dark:text-primary-400'
-                  : 'text-gray-600 dark:text-gray-400'
+                  ? 'text-blue-600 dark:text-blue-400'
+                  : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200'
               )}
+              aria-current={isActive ? 'page' : undefined}
             >
-              <span className="text-2xl" role="img" aria-label={item.label}>
+              {/* Icon with scale animation */}
+              <span 
+                className={clsx(
+                  'text-2xl transition-transform duration-200',
+                  isActive && 'scale-110'
+                )} 
+                role="img" 
+                aria-label={item.label}
+              >
                 {isActive ? item.activeIcon : item.icon}
               </span>
-              <span className="mt-1 text-xs font-medium">{item.label}</span>
+              
+              {/* Label */}
+              <span 
+                className={clsx(
+                  'mt-1 text-xs font-medium transition-all',
+                  isActive ? 'opacity-100' : 'opacity-70'
+                )}
+              >
+                {item.label}
+              </span>
+              
+              {/* Active indicator */}
               {isActive && (
-                <div className="absolute bottom-0 h-1 w-12 rounded-t-full bg-primary-600 dark:bg-primary-400" />
+                <div className="absolute bottom-0 h-1 w-12 animate-fade-in rounded-t-full bg-blue-600 dark:bg-blue-400" />
               )}
+              
+              {/* Hover effect */}
+              <div className="absolute inset-0 -z-10 rounded-lg bg-gray-100 opacity-0 transition-opacity group-hover:opacity-50 dark:bg-gray-800" />
             </Link>
           );
         })}
       </div>
+      
+      {/* Safe area padding for iOS */}
+      <div className="h-safe-bottom bg-white dark:bg-gray-900" />
     </nav>
   );
 }

@@ -1,119 +1,141 @@
 /**
- * Pull-to-Refresh Component
+ * Pull to Refresh Component
  * 
- * Mobile-native pull-to-refresh functionality.
- * Uses CSS transforms for smooth animations.
+ * Mobile-optimized pull-to-refresh interaction
+ * Works with touch events for smooth user experience
  */
 
 'use client';
 
-import { useState, useRef, useCallback, useEffect } from 'react';
-import clsx from 'clsx';
+import { ReactNode, useState, useRef, useCallback } from 'react';
 
 interface PullToRefreshProps {
+  children: ReactNode;
   onRefresh: () => Promise<void>;
-  children: React.ReactNode;
+  threshold?: number;
+  disabled?: boolean;
 }
 
-export function PullToRefresh({ onRefresh, children }: PullToRefreshProps) {
+export function PullToRefresh({
+  children,
+  onRefresh,
+  threshold = 80,
+  disabled = false,
+}: PullToRefreshProps) {
+  const [pulling, setPulling] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [pullDistance, setPullDistance] = useState(0);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [canPull, setCanPull] = useState(false);
-  const touchStartY = useRef(0);
+  
+  const startY = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const PULL_THRESHOLD = 80;
-  const MAX_PULL = 150;
-
-  const handleTouchStart = useCallback((e: TouchEvent) => {
-    // Only allow pull-to-refresh at the top of the page
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (disabled || refreshing) return;
+    
+    // Only trigger if scrolled to top
     if (window.scrollY === 0) {
-      touchStartY.current = e.touches[0].clientY;
-      setCanPull(true);
+      startY.current = e.touches[0].clientY;
+      setPulling(true);
     }
-  }, []);
+  }, [disabled, refreshing]);
 
-  const handleTouchMove = useCallback(
-    (e: TouchEvent) => {
-      if (!canPull || isRefreshing) return;
-
-      const currentY = e.touches[0].clientY;
-      const distance = currentY - touchStartY.current;
-
-      if (distance > 0 && window.scrollY === 0) {
-        // Prevent default scroll behavior
-        e.preventDefault();
-        
-        // Apply diminishing returns for natural feel
-        const adjustedDistance = Math.min(
-          distance * 0.5,
-          MAX_PULL
-        );
-        setPullDistance(adjustedDistance);
-      }
-    },
-    [canPull, isRefreshing]
-  );
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!pulling || disabled || refreshing) return;
+    
+    const currentY = e.touches[0].clientY;
+    const distance = currentY - startY.current;
+    
+    // Only allow pull down
+    if (distance > 0) {
+      // Resistance effect: slower pull the further you go
+      const resistance = 0.5;
+      const adjustedDistance = distance * resistance;
+      setPullDistance(Math.min(adjustedDistance, threshold * 1.5));
+    }
+  }, [pulling, disabled, refreshing, threshold]);
 
   const handleTouchEnd = useCallback(async () => {
-    if (!canPull) return;
-
-    setCanPull(false);
-
-    if (pullDistance >= PULL_THRESHOLD && !isRefreshing) {
-      setIsRefreshing(true);
+    if (!pulling || disabled) return;
+    
+    setPulling(false);
+    
+    if (pullDistance >= threshold) {
+      setRefreshing(true);
       try {
         await onRefresh();
       } catch (error) {
         console.error('Refresh failed:', error);
       } finally {
-        setIsRefreshing(false);
+        setRefreshing(false);
         setPullDistance(0);
       }
     } else {
       setPullDistance(0);
     }
-  }, [canPull, pullDistance, isRefreshing, onRefresh, PULL_THRESHOLD]);
+  }, [pulling, disabled, pullDistance, threshold, onRefresh]);
 
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    container.addEventListener('touchstart', handleTouchStart, { passive: true });
-    container.addEventListener('touchmove', handleTouchMove, { passive: false });
-    container.addEventListener('touchend', handleTouchEnd, { passive: true });
-
-    return () => {
-      container.removeEventListener('touchstart', handleTouchStart);
-      container.removeEventListener('touchmove', handleTouchMove);
-      container.removeEventListener('touchend', handleTouchEnd);
-    };
-  }, [handleTouchStart, handleTouchMove, handleTouchEnd]);
-
-  const showRefreshIndicator = pullDistance > 0 || isRefreshing;
-  const indicatorRotation = Math.min(pullDistance / PULL_THRESHOLD, 1) * 360;
+  const progress = Math.min((pullDistance / threshold) * 100, 100);
+  const shouldTrigger = pullDistance >= threshold;
 
   return (
-    <div ref={containerRef} className="relative">
-      {/* Refresh Indicator */}
+    <div
+      ref={containerRef}
+      className="relative"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      {/* Pull Indicator */}
       <div
-        className={clsx(
-          'absolute left-0 right-0 top-0 flex justify-center transition-opacity',
-          showRefreshIndicator ? 'opacity-100' : 'opacity-0'
-        )}
+        className="pointer-events-none absolute left-0 right-0 top-0 z-50 flex items-center justify-center overflow-hidden transition-all duration-200"
         style={{
-          transform: `translateY(${pullDistance - 40}px)`,
+          height: refreshing ? '60px' : `${pullDistance}px`,
+          opacity: pulling || refreshing ? 1 : 0,
         }}
       >
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white shadow-lg dark:bg-gray-800">
-          {isRefreshing ? (
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary-600 border-t-transparent dark:border-primary-400" />
+        <div className="flex flex-col items-center space-y-2">
+          {/* Spinner or Icon */}
+          {refreshing ? (
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-solid border-blue-600 border-t-transparent" />
           ) : (
             <div
-              className="text-xl transition-transform"
-              style={{ transform: `rotate(${indicatorRotation}deg)` }}
+              className="transition-transform duration-200"
+              style={{
+                transform: shouldTrigger ? 'rotate(180deg)' : 'rotate(0deg)',
+              }}
             >
-              ↓
+              <svg
+                className="h-8 w-8 text-blue-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M19 14l-7 7m0 0l-7-7m7 7V3"
+                />
+              </svg>
+            </div>
+          )}
+          
+          {/* Text */}
+          <span className="text-xs font-medium text-gray-600 dark:text-gray-400">
+            {refreshing
+              ? '새로고침 중...'
+              : shouldTrigger
+              ? '놓아서 새로고침'
+              : '당겨서 새로고침'}
+          </span>
+          
+          {/* Progress Bar */}
+          {!refreshing && (
+            <div className="h-1 w-16 overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+              <div
+                className="h-full bg-blue-600 transition-all duration-100"
+                style={{ width: `${progress}%` }}
+              />
             </div>
           )}
         </div>
@@ -121,9 +143,9 @@ export function PullToRefresh({ onRefresh, children }: PullToRefreshProps) {
 
       {/* Content */}
       <div
+        className="transition-transform duration-200"
         style={{
-          transform: `translateY(${pullDistance}px)`,
-          transition: isRefreshing || pullDistance === 0 ? 'transform 0.3s' : 'none',
+          transform: pulling || refreshing ? `translateY(${Math.min(pullDistance, 60)}px)` : 'translateY(0)',
         }}
       >
         {children}
