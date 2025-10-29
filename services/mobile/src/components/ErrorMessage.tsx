@@ -27,7 +27,7 @@ export function ErrorMessage({
       </Heading>
       <Text className="mb-6 text-gray-600 dark:text-gray-400">{message}</Text>
       {onRetry && (
-        <Button onClick={onRetry} color="primary">
+        <Button onClick={onRetry} color="blue">
           다시 시도
         </Button>
       )}

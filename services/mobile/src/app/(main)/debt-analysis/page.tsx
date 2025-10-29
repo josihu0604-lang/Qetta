@@ -306,7 +306,7 @@ export default function DebtAnalysisPage() {
                 </div>
               </div>
               {index > 0 && (
-                <Button className="mt-3 w-full" color="primary">
+                <Button className="mt-3 w-full" color="blue">
                   이 계획 시작하기
                 </Button>
               )}

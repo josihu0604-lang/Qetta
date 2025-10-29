@@ -32,7 +32,7 @@ export default function MobileDemoPage() {
       <section className="mb-8">
         <Heading level={2}>Buttons</Heading>
         <div className="mt-3 space-y-3">
-          <Button color="primary" className="w-full">
+          <Button color="blue" className="w-full">
             Primary Button
           </Button>
           <Button outline className="w-full">
@@ -47,7 +47,7 @@ export default function MobileDemoPage() {
       <section className="mb-8">
         <Heading level={2}>Badges</Heading>
         <div className="mt-3 flex flex-wrap gap-2">
-          <Badge color="primary">Primary</Badge>
+          <Badge color="blue">Primary</Badge>
           <Badge color="green">Success</Badge>
           <Badge color="yellow">Warning</Badge>
           <Badge color="red">Error</Badge>

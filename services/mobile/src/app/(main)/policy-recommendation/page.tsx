@@ -275,7 +275,7 @@ export default function PolicyRecommendationPage() {
                   자세히 보기
                 </Button>
                 <Button
-                  color="primary"
+                  color="blue"
                   className="w-full"
                   disabled={policy.applicationStatus === 'not_eligible'}
                 >

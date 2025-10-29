@@ -135,7 +135,7 @@ export default function AccountsPage() {
       <div className="mt-6 px-4">
         <div className="grid grid-cols-2 gap-3">
           <Link href="/connect">
-            <Button className="w-full" color="primary">
+            <Button className="w-full" color="blue">
               + 계좌 연결
             </Button>
           </Link>
