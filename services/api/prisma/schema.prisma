@@ -1,0 +1,274 @@
+// This is your Prisma schema file
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ========================================
+// User & Authentication Models
+// ========================================
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String?
+  phone        String?
+  birthDate    DateTime? @map("birth_date")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  oauthConnections     OAuthConnection[]
+  accounts             Account[]
+  documents            Document[]
+  debtAnalyses         DebtAnalysis[]
+  applications         Application[]
+
+  @@index([email])
+  @@map("users")
+}
+
+model OAuthConnection {
+  id           String    @id @default(cuid())
+  userId       String    @map("user_id")
+  provider     String    // 'toss' | 'kftc'
+  accessToken  String    @map("access_token") @db.Text // Encrypted with AES-256-GCM
+  refreshToken String?   @map("refresh_token") @db.Text // Encrypted
+  expiresAt    DateTime? @map("expires_at")
+  userSeqNo    String?   @map("user_seq_no") @db.Text // KFTC user sequence number (encrypted)
+  lastSyncAt   DateTime? @map("last_sync_at")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@index([userId])
+  @@index([lastSyncAt])
+  @@map("oauth_connections")
+}
+
+// ========================================
+// Financial Data Models
+// ========================================
+
+model Account {
+  id              String    @id @default(cuid())
+  userId          String    @map("user_id")
+  provider        String    // 'toss' | 'kftc'
+  accountNumber   String    @map("account_number") // Encrypted
+  accountName     String    @map("account_name")
+  accountType     String    @map("account_type") // 'CHECKING' | 'SAVINGS' | 'LOAN' | 'CREDIT'
+  bankName        String    @map("bank_name")
+  bankCode        String?   @map("bank_code")
+  balance         Decimal   @default(0) @db.Decimal(15, 2)
+  availableAmount Decimal?  @map("available_amount") @db.Decimal(15, 2)
+  currency        String    @default("KRW")
+  isActive        Boolean   @default(true) @map("is_active")
+  lastSyncAt      DateTime? @map("last_sync_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@index([userId, isActive])
+  @@index([lastSyncAt])
+  @@map("accounts")
+}
+
+model Transaction {
+  id              String   @id @default(cuid())
+  accountId       String   @map("account_id")
+  transactionDate DateTime @map("transaction_date")
+  transactionTime String?  @map("transaction_time")
+  transactionType String   @map("transaction_type") // 'DEPOSIT' | 'WITHDRAWAL' | 'TRANSFER'
+  amount          Decimal  @db.Decimal(15, 2)
+  balance         Decimal? @db.Decimal(15, 2) // Balance after transaction
+  merchantName    String?  @map("merchant_name")
+  category        String?
+  memo            String?
+  externalId      String?  @map("external_id") // Bank's transaction ID
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  // Relations
+  account Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@index([accountId, transactionDate(sort: Desc)])
+  @@index([transactionDate])
+  @@index([externalId])
+  @@map("transactions")
+}
+
+// ========================================
+// Document Management Models
+// ========================================
+
+model Document {
+  id          String    @id @default(cuid())
+  userId      String    @map("user_id")
+  fileName    String    @map("file_name")
+  fileType    String    @map("file_type") // 'BANK_STATEMENT' | 'PAYSLIP' | 'ID_CARD' | 'UTILITY_BILL' | 'OTHER'
+  fileSize    Int       @map("file_size") // in bytes
+  mimeType    String    @map("mime_type")
+  s3Key       String    @map("s3_key")
+  s3Bucket    String    @map("s3_bucket")
+  s3Url       String    @map("s3_url")
+  uploadedAt  DateTime  @default(now()) @map("uploaded_at")
+  verifiedAt  DateTime? @map("verified_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  user         User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verification DocumentVerification?
+
+  @@index([userId, uploadedAt(sort: Desc)])
+  @@map("documents")
+}
+
+model DocumentVerification {
+  id                 String   @id @default(cuid())
+  documentId         String   @unique @map("document_id")
+  status             String   @default("PENDING") // 'PENDING' | 'PROCESSING' | 'VERIFIED' | 'FAILED'
+  confidenceScore    Float?   @map("confidence_score") // 0-100
+  extractedData      Json?    @map("extracted_data") // OCR results
+  verificationResult Json?    @map("verification_result") // Cross-verification results
+  fraudScore         Float?   @map("fraud_score") // 0-100, higher = more suspicious
+  fraudReasons       String[] @map("fraud_reasons") // Array of detected fraud patterns
+  startedAt          DateTime? @map("started_at")
+  completedAt        DateTime? @map("completed_at")
+  errorMessage       String?  @map("error_message")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@map("document_verifications")
+}
+
+// ========================================
+// Debt Analysis Models
+// ========================================
+
+model DebtAnalysis {
+  id               String   @id @default(cuid())
+  userId           String   @map("user_id")
+  totalDebt        Decimal  @map("total_debt") @db.Decimal(15, 2)
+  totalAssets      Decimal  @map("total_assets") @db.Decimal(15, 2)
+  monthlyIncome    Decimal  @map("monthly_income") @db.Decimal(15, 2)
+  monthlyExpenses  Decimal  @map("monthly_expenses") @db.Decimal(15, 2)
+  dti              Float    // Debt-to-Income ratio
+  dsr              Float    // Debt Service Ratio
+  creditGrade      String   @map("credit_grade") // 'EXCELLENT' | 'GOOD' | 'FAIR' | 'POOR'
+  analysisDate     DateTime @default(now()) @map("analysis_date")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  policyMatches PolicyMatch[]
+
+  @@index([userId, analysisDate(sort: Desc)])
+  @@map("debt_analyses")
+}
+
+model PolicyMatch {
+  id                String   @id @default(cuid())
+  debtAnalysisId    String   @map("debt_analysis_id")
+  policyType        String   @map("policy_type") // 'CREDIT_COUNSELING' | 'FRESH_START_FUND' | 'PERSONAL_REHABILITATION'
+  eligibilityScore  Float    @map("eligibility_score") // 0-100
+  estimatedBenefit  Decimal  @map("estimated_benefit") @db.Decimal(15, 2) // Estimated debt reduction amount
+  monthlyPayment    Decimal? @map("monthly_payment") @db.Decimal(15, 2) // Estimated monthly payment after restructuring
+  repaymentPeriod   Int?     @map("repayment_period") // in months
+  requirements      String[] // Array of required documents/conditions
+  processingTime    String?  @map("processing_time") // e.g., "2-4 weeks"
+  contactInfo       Json?    @map("contact_info") // Organization contact details
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  // Relations
+  debtAnalysis DebtAnalysis @relation(fields: [debtAnalysisId], references: [id], onDelete: Cascade)
+
+  @@index([debtAnalysisId, eligibilityScore(sort: Desc)])
+  @@map("policy_matches")
+}
+
+// ========================================
+// Application Models
+// ========================================
+
+model Application {
+  id               String    @id @default(cuid())
+  userId           String    @map("user_id")
+  policyType       String    @map("policy_type") // 'CREDIT_COUNSELING' | 'FRESH_START_FUND' | 'PERSONAL_REHABILITATION'
+  status           String    @default("DRAFT") @map("status") // 'DRAFT' | 'PENDING' | 'SUBMITTED' | 'APPROVED' | 'REJECTED'
+  pdfUrl           String?   @map("pdf_url")
+  s3Key            String?   @map("s3_key")
+  applicationData  Json      @map("application_data") // Pre-filled form data
+  submittedAt      DateTime? @map("submitted_at")
+  processedAt      DateTime? @map("processed_at")
+  idempotencyKey   String?   @unique @map("idempotency_key") // For preventing duplicate submissions
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([status])
+  @@index([idempotencyKey])
+  @@map("applications")
+}
+
+// ========================================
+// Audit & Decision Log Models (11모델 완성)
+// ========================================
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?  @map("user_id") // nullable for system actions
+  action    String   // 'CREATE' | 'UPDATE' | 'DELETE' | 'LOGIN' | 'OAUTH_CONNECT' | 'PDF_GENERATE'
+  resource  String   // 'User' | 'OAuthConnection' | 'Application' | 'DebtAnalysis'
+  resourceId String? @map("resource_id")
+  details   Json?    // Additional context (before/after values)
+  ip        String?  // Client IP address
+  userAgent String?  @map("user_agent") @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, action, createdAt(sort: Desc)])
+  @@index([resource, resourceId])
+  @@index([createdAt(sort: Desc)])
+  @@map("audit_logs")
+}
+
+model DecisionLog {
+  id         String   @id @default(cuid())
+  userId     String?  @map("user_id") // nullable for system decisions
+  actor      String   // 'user' | 'system' | 'ai_agent' | 'admin'
+  decision   String   // 'APPROVE_APPLICATION' | 'REJECT_LOAN' | 'RECOMMEND_POLICY'
+  request    Json     // Input data for the decision
+  context    Json?    // Additional context (DTI, DSR, credit grade, etc.)
+  tools      Json?    // Tools/APIs used in decision making
+  citations  Json?    // Reference sources (policy documents, regulations)
+  risks      Json?    // Identified risks and mitigation
+  outcome    Json     // Decision result and reasoning
+  confidence Float?   // Confidence score (0-1)
+  reviewedBy String?  @map("reviewed_by") // Admin who reviewed the decision
+  reviewedAt DateTime? @map("reviewed_at")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([userId, decision, createdAt(sort: Desc)])
+  @@index([actor, createdAt(sort: Desc)])
+  @@index([decision])
+  @@index([createdAt(sort: Desc)])
+  @@map("decision_logs")
+}
