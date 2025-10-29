@@ -153,7 +153,7 @@ export default function DebtAnalysisPage() {
   return (
     <div className="min-h-screen bg-gray-50 pb-20 dark:bg-gray-950">
       {/* Header */}
-      <div className="bg-gradient-to-br from-red-500 to-red-600 px-4 py-6 text-white shadow-lg">
+      <div className="bg-gradient-to-br from-blue-600 to-indigo-600 px-4 py-6 text-white shadow-lg">
         <Heading className="text-white">부채 분석</Heading>
         <Text className="mt-1 text-sm opacity-90">
           AI 기반 효율적인 부채 관리 전략

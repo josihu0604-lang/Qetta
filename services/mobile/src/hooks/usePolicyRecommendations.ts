@@ -37,7 +37,7 @@ export function usePolicyRecommendations() {
       // TODO: Replace with actual API call
       // return apiClient.get<PolicyRecommendationsData>('/api/v1/policy-recommendations');
       
-      await new Promise((resolve) => setTimeout(resolve, 700));
+      await new Promise((resolve) => setTimeout(resolve, 100)); // Reduced delay for better UX
       
       return {
         policies: [

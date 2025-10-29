@@ -49,7 +49,7 @@ export function useDebtAnalysis() {
       // TODO: Replace with actual API call
       // return apiClient.get<DebtAnalysisData>('/api/v1/debt-analysis');
       
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      await new Promise((resolve) => setTimeout(resolve, 100)); // Reduced delay for better UX
       
       return {
         totalDebt: 18_700_000,
