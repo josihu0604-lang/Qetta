@@ -8,6 +8,8 @@
  * - 신청 가이드
  */
 
+'use client';
+
 import {
   Heading,
   Text,
@@ -15,9 +17,11 @@ import {
   Button,
   Divider,
 } from '@hephaitos/ui';
+import { usePolicyRecommendations } from '@/hooks/usePolicyRecommendations';
+import { useState } from 'react';
 
-// Mock data
-const mockPolicies = {
+// OLD Mock data (REMOVED)
+const mockPoliciesOLD = {
   eligibilityScore: 85,
   totalPotentialBenefit: 8_500_000,
   recommendations: [
@@ -118,39 +122,90 @@ function getDifficultyBadge(difficulty: string) {
 }
 
 export default function PolicyRecommendationPage() {
-  const { eligibilityScore, totalPotentialBenefit, recommendations, categories } = mockPolicies;
+  const { data: policyData, isLoading, error } = usePolicyRecommendations();
+  const [selectedCategory, setSelectedCategory] = useState<string>('전체');
+  const [expandedPolicy, setExpandedPolicy] = useState<number | null>(null);
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">
+        <div className="text-center">
+          <div className="mb-4 inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent" />
+          <Text>정책 분석 중...</Text>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !policyData) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 dark:bg-gray-950">
+        <div className="text-center">
+          <Text className="text-red-600">정책 데이터를 불러올 수 없습니다.</Text>
+          <Button className="mt-4" onClick={() => window.location.reload()}>
+            다시 시도
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const { policies, totalPotentialBenefit, matchedCount } = policyData;
+
+  // Filter policies by category
+  const filteredPolicies = selectedCategory === '전체' 
+    ? policies 
+    : policies.filter(p => p.category === selectedCategory);
+
+  // Calculate category counts
+  const categories = [
+    { name: '전체', count: policies.length },
+    { name: 'loan', count: policies.filter(p => p.category === 'loan').length },
+    { name: 'subsidy', count: policies.filter(p => p.category === 'subsidy').length },
+    { name: 'welfare', count: policies.filter(p => p.category === 'welfare').length },
+  ];
+
+  const categoryLabels: Record<string, string> = {
+    '전체': '전체',
+    'loan': '대출',
+    'subsidy': '보조금',
+    'tax': '세금',
+    'welfare': '복지',
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20 dark:bg-gray-950">
       {/* Header */}
-      <div className="bg-white px-4 py-6 shadow-sm dark:bg-gray-900">
-        <Heading>정책 추천</Heading>
-        <Text className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-          AI가 분석한 맞춤 정부 지원 정책
+      <div className="bg-gradient-to-br from-blue-500 to-indigo-600 px-4 py-6 text-white shadow-lg">
+        <Heading className="text-white">맞춤 정책 추천</Heading>
+        <Text className="mt-1 text-sm opacity-90">
+          AI 분석 기반 정부 지원 정책
         </Text>
       </div>
 
-      {/* Eligibility Score */}
-      <div className="mt-6 px-4">
-        <div className="rounded-lg bg-gradient-to-br from-primary-500 to-primary-600 p-6 text-white shadow-lg">
+      {/* Summary Card */}
+      <div className="-mt-4 px-4">
+        <div className="rounded-lg bg-white p-6 shadow-lg dark:bg-gray-900">
           <div className="flex items-center justify-between">
             <div>
-              <Text className="text-sm opacity-90">정책 적합도 점수</Text>
-              <Heading className="mt-2 text-white">{eligibilityScore}점</Heading>
+              <Text className="text-sm text-gray-600 dark:text-gray-400">매칭된 정책</Text>
+              <Heading className="mt-2 text-blue-600 dark:text-blue-400">{matchedCount}건</Heading>
             </div>
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/20 text-3xl">
-              🎯
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-100 text-3xl dark:bg-blue-900/50">
+              ✨
             </div>
           </div>
-          <Divider className="my-4 opacity-30" />
+          <Divider className="my-4" />
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <Text className="text-xs opacity-75">추천 정책</Text>
-              <Text className="mt-1 font-semibold">{recommendations.length}건</Text>
+              <Text className="text-xs text-gray-600 dark:text-gray-400">평균 매칭률</Text>
+              <Text className="mt-1 font-semibold">
+                {Math.round(policies.reduce((sum, p) => sum + p.matchRate, 0) / policies.length)}%
+              </Text>
             </div>
             <div>
-              <Text className="text-xs opacity-75">예상 총 혜택</Text>
-              <Text className="mt-1 font-semibold">
+              <Text className="text-xs text-gray-600 dark:text-gray-400">예상 총 혜택</Text>
+              <Text className="mt-1 font-semibold text-green-600 dark:text-green-400">
                 {formatCurrency(totalPotentialBenefit)}
               </Text>
             </div>
@@ -161,12 +216,17 @@ export default function PolicyRecommendationPage() {
       {/* Category Filter */}
       <div className="mt-6 px-4">
         <div className="flex space-x-2 overflow-x-auto pb-2">
-          {categories.map((category) => (
+          {categories.filter(c => c.count > 0).map((category) => (
             <button
               key={category.name}
-              className="flex-shrink-0 rounded-full bg-white px-4 py-2 text-sm font-medium shadow-sm dark:bg-gray-900"
+              onClick={() => setSelectedCategory(category.name)}
+              className={`flex-shrink-0 rounded-full px-4 py-2 text-sm font-medium shadow-sm transition-all ${
+                selectedCategory === category.name
+                  ? 'bg-blue-600 text-white dark:bg-blue-500'
+                  : 'bg-white text-gray-700 hover:bg-gray-50 dark:bg-gray-900 dark:text-gray-300'
+              }`}
             >
-              {category.name} ({category.count})
+              {categoryLabels[category.name] || category.name} ({category.count})
             </button>
           ))}
         </div>
@@ -175,115 +235,127 @@ export default function PolicyRecommendationPage() {
       {/* Policy Recommendations */}
       <div className="mt-6 px-4">
         <div className="mb-3 flex items-center justify-between">
-          <Heading level={3}>추천 정책 ({recommendations.length})</Heading>
-          <Text className="text-sm text-primary-600 dark:text-primary-400">
-            적합도순 ▼
+          <Heading level={3}>
+            {selectedCategory === '전체' ? '전체 정책' : categoryLabels[selectedCategory]} ({filteredPolicies.length})
+          </Heading>
+          <Text className="text-sm text-blue-600 dark:text-blue-400">
+            매칭률순 ▼
           </Text>
         </div>
         <div className="space-y-4">
-          {recommendations.map((policy) => (
+          {filteredPolicies.map((policy) => (
             <div
               key={policy.id}
-              className="rounded-lg bg-white p-5 shadow-sm dark:bg-gray-900"
+              className="cursor-pointer rounded-lg bg-white p-5 shadow-sm transition-shadow hover:shadow-md dark:bg-gray-900"
+              onClick={() => setExpandedPolicy(expandedPolicy === policy.id ? null : policy.id)}
             >
               {/* Header */}
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center space-x-2">
-                    <Heading level={4}>{policy.title}</Heading>
-                    {getStatusBadge(policy.applicationStatus)}
+                    <Heading level={4}>{policy.name}</Heading>
+                    <Badge color={
+                      policy.matchRate >= 85 ? 'green' : 
+                      policy.matchRate >= 70 ? 'yellow' : 
+                      'zinc'
+                    }>
+                      {policy.matchRate}% 매칭
+                    </Badge>
                   </div>
                   <Text className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-                    {policy.provider} · {policy.category}
+                    {policy.provider} · {categoryLabels[policy.category] || policy.category}
                   </Text>
                 </div>
               </div>
 
-              {/* Match Score */}
-              <div className="mt-3 flex items-center space-x-2">
-                <div className="flex-1">
-                  <div className="h-2 rounded-full bg-gray-200 dark:bg-gray-700">
-                    <div
-                      className="h-2 rounded-full bg-primary-500"
-                      style={{ width: `${policy.matchScore}%` }}
-                    />
-                  </div>
+              {/* Match Score Progress */}
+              <div className="mt-3">
+                <div className="h-2 rounded-full bg-gray-200 dark:bg-gray-700">
+                  <div
+                    className={`h-2 rounded-full transition-all ${
+                      policy.matchRate >= 85 ? 'bg-green-500' : 
+                      policy.matchRate >= 70 ? 'bg-yellow-500' : 
+                      'bg-gray-500'
+                    }`}
+                    style={{ width: `${policy.matchRate}%` }}
+                  />
                 </div>
-                <Text className="text-sm font-semibold text-primary-600 dark:text-primary-400">
-                  {policy.matchScore}%
-                </Text>
               </div>
 
               <Divider className="my-4" />
 
+              {/* Description */}
+              <Text className="text-sm text-gray-700 dark:text-gray-300">
+                {policy.description}
+              </Text>
+
               {/* Estimated Benefit */}
-              <div className="rounded-lg bg-green-50 p-3 dark:bg-green-950/20">
+              <div className="mt-4 rounded-lg bg-green-50 p-3 dark:bg-green-950/20">
                 <Text className="text-xs text-green-800 dark:text-green-300">
-                  예상 지원 혜택
+                  최대 혜택 금액
                 </Text>
                 <Heading level={3} className="mt-1 text-green-900 dark:text-green-400">
-                  {formatCurrency(policy.estimatedBenefit)}
+                  {formatCurrency(policy.maxBenefit)}
                 </Heading>
               </div>
 
-              {/* Requirements */}
-              <div className="mt-4">
-                <div className="mb-2 flex items-center justify-between">
-                  <Text className="text-sm font-semibold">신청 요건</Text>
-                  {getDifficultyBadge(policy.difficulty)}
+              {/* Expandable Details */}
+              {expandedPolicy === policy.id && (
+                <div className="mt-4 space-y-4 animate-fade-in">
+                  {/* Requirements */}
+                  <div>
+                    <Text className="mb-2 text-sm font-semibold">✓ 신청 요건</Text>
+                    <ul className="space-y-1">
+                      {policy.eligibilityRequirements.map((req, index) => (
+                        <li
+                          key={index}
+                          className="flex items-start text-sm text-gray-700 dark:text-gray-300"
+                        >
+                          <span className="mr-2 text-green-500">•</span>
+                          <span>{req}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Benefits Details */}
+                  <div>
+                    <Text className="mb-2 text-sm font-semibold">💰 상세 혜택</Text>
+                    <div className="space-y-2">
+                      {policy.benefits.map((benefit, index) => (
+                        <div key={index} className="rounded-lg bg-gray-50 p-2 dark:bg-gray-800">
+                          <Text className="text-xs text-gray-600 dark:text-gray-400">
+                            {benefit.label}
+                          </Text>
+                          <Text className="mt-1 font-semibold">{benefit.value}</Text>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Application Period */}
+                  <div className="flex items-center justify-between rounded-lg bg-blue-50 p-3 dark:bg-blue-950/20">
+                    <Text className="text-sm text-blue-800 dark:text-blue-300">
+                      📅 신청 기간
+                    </Text>
+                    <Text className="font-semibold text-blue-900 dark:text-blue-400">
+                      {policy.applicationPeriod}
+                    </Text>
+                  </div>
                 </div>
-                <ul className="space-y-1">
-                  {policy.requirements.map((req, index) => (
-                    <li
-                      key={index}
-                      className="flex items-start text-sm text-gray-700 dark:text-gray-300"
-                    >
-                      <span className="mr-2 text-green-500">✓</span>
-                      <span>{req}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Benefits */}
-              <div className="mt-4">
-                <Text className="mb-2 text-sm font-semibold">주요 혜택</Text>
-                <ul className="space-y-1">
-                  {policy.benefits.map((benefit, index) => (
-                    <li
-                      key={index}
-                      className="flex items-start text-sm text-gray-700 dark:text-gray-300"
-                    >
-                      <span className="mr-2 text-blue-500">•</span>
-                      <span>{benefit}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              {/* Deadline */}
-              <div className="mt-4 flex items-center space-x-2 text-sm">
-                <Text className="text-gray-600 dark:text-gray-400">신청 마감:</Text>
-                <Text className="font-medium text-red-600 dark:text-red-400">
-                  {policy.deadline}
-                </Text>
-              </div>
+              )}
 
               {/* Actions */}
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                <Button outline className="w-full">
-                  자세히 보기
-                </Button>
-                <Button
+              <div className="mt-4">
+                <Button 
+                  className="w-full" 
                   color="blue"
-                  className="w-full"
-                  disabled={policy.applicationStatus === 'not_eligible'}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    window.open(policy.applicationUrl, '_blank');
+                  }}
                 >
-                  {policy.applicationStatus === 'eligible'
-                    ? '신청하기'
-                    : policy.applicationStatus === 'review_needed'
-                    ? '요건 확인'
-                    : '요건 미달'}
+                  {expandedPolicy === policy.id ? '신청 페이지로 이동 →' : '자세히 보기'}
                 </Button>
               </div>
             </div>
@@ -293,21 +365,55 @@ export default function PolicyRecommendationPage() {
 
       {/* AI Insight */}
       <div className="mt-6 px-4 pb-6">
-        <div className="rounded-lg bg-blue-50 p-4 dark:bg-blue-950/20">
+        <div className="rounded-lg bg-gradient-to-br from-purple-50 to-pink-50 p-4 dark:from-purple-950/20 dark:to-pink-950/20">
           <div className="flex items-start space-x-3">
-            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-xl dark:bg-blue-900">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-purple-100 text-xl dark:bg-purple-900/50">
               🤖
             </div>
             <div className="flex-1">
-              <Text className="font-semibold text-blue-900 dark:text-blue-400">
-                AI 추천 팁
+              <Text className="font-semibold text-purple-900 dark:text-purple-400">
+                AI 추천 전략
               </Text>
-              <Text className="mt-1 text-sm text-blue-800 dark:text-blue-300">
-                현재 프로필 기준으로 <strong>청년내일채움공제</strong>와{' '}
-                <strong>근로장려금</strong>을 우선 신청하면 연간 약{' '}
-                <strong>{formatCurrency(5_500_000)}</strong>의 혜택을 받을 수 있습니다.
+              <Text className="mt-1 text-sm text-purple-800 dark:text-purple-300">
+                현재 매칭된 정책 중 상위 3개를 모두 신청하면 최대{' '}
+                <strong className="text-purple-900 dark:text-purple-200">
+                  {formatCurrency(
+                    policies
+                      .slice(0, 3)
+                      .reduce((sum, p) => sum + p.maxBenefit, 0)
+                  )}
+                </strong>
+                의 혜택을 받을 수 있습니다.
               </Text>
             </div>
+          </div>
+        </div>
+
+        {/* Quick Stats */}
+        <div className="mt-4 grid grid-cols-3 gap-3">
+          <div className="rounded-lg bg-white p-3 text-center shadow-sm dark:bg-gray-900">
+            <Text className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+              {policies.filter(p => p.matchRate >= 80).length}
+            </Text>
+            <Text className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+              고매칭 정책
+            </Text>
+          </div>
+          <div className="rounded-lg bg-white p-3 text-center shadow-sm dark:bg-gray-900">
+            <Text className="text-2xl font-bold text-green-600 dark:text-green-400">
+              {policies.filter(p => p.category === 'subsidy').length}
+            </Text>
+            <Text className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+              보조금 지원
+            </Text>
+          </div>
+          <div className="rounded-lg bg-white p-3 text-center shadow-sm dark:bg-gray-900">
+            <Text className="text-2xl font-bold text-purple-600 dark:text-purple-400">
+              {policies.filter(p => p.category === 'loan').length}
+            </Text>
+            <Text className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+              저금리 대출
+            </Text>
           </div>
         </div>
       </div>

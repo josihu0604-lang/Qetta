@@ -3,11 +3,13 @@
  * 
  * Features:
  * - 총 부채 현황
- * - 부채 종류별 분포
+ * - 부채 종류별 분포 (도넛 차트)
  * - 금리 비교
  * - 상환 계획 시뮬레이션
  * - AI 기반 부채 감소 제안
  */
+
+'use client';
 
 import {
   Heading,
@@ -16,9 +18,12 @@ import {
   Button,
   Divider,
 } from '@hephaitos/ui';
+import { useDebtAnalysis } from '@/hooks/useDebtAnalysis';
+import { DebtDonutChart } from '@/components/charts/DebtDonutChart';
+import { useState } from 'react';
 
-// Mock data
-const mockDebtData = {
+// REMOVED Mock data - now using useDebtAnalysis hook
+const mockDebtDataOLD = {
   totalDebt: 12_500_000,
   monthlyPayment: 850_000,
   averageInterestRate: 5.2,
@@ -116,45 +121,159 @@ function getPriorityBadge(priority: string) {
 }
 
 export default function DebtAnalysisPage() {
-  const { totalDebt, monthlyPayment, averageInterestRate, debts, insights, payoffScenarios } =
-    mockDebtData;
+  const { data: debtAnalysis, isLoading, error } = useDebtAnalysis();
+  const [selectedScenario, setSelectedScenario] = useState<number>(0);
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 dark:bg-gray-950">
+        <div className="text-center">
+          <div className="mb-4 inline-block h-12 w-12 animate-spin rounded-full border-4 border-solid border-blue-600 border-r-transparent" />
+          <Text>부채 분석 중...</Text>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !debtAnalysis) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 dark:bg-gray-950">
+        <div className="text-center">
+          <Text className="text-red-600">데이터를 불러올 수 없습니다.</Text>
+          <Button className="mt-4" onClick={() => window.location.reload()}>
+            다시 시도
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const { totalDebt, monthlyPayment, averageInterestRate, breakdown, aiInsight, recommendations, simulationScenarios, debtToIncomeRatio, creditUtilizationRate } = debtAnalysis;
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20 dark:bg-gray-950">
       {/* Header */}
-      <div className="bg-white px-4 py-6 shadow-sm dark:bg-gray-900">
-        <Heading>부채 분석</Heading>
-        <Text className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-          효율적인 부채 관리 전략을 제안합니다
+      <div className="bg-gradient-to-br from-red-500 to-red-600 px-4 py-6 text-white shadow-lg">
+        <Heading className="text-white">부채 분석</Heading>
+        <Text className="mt-1 text-sm opacity-90">
+          AI 기반 효율적인 부채 관리 전략
         </Text>
       </div>
 
       {/* Summary Cards */}
-      <div className="mt-6 px-4">
-        <div className="rounded-lg bg-gradient-to-br from-red-500 to-red-600 p-6 text-white shadow-lg">
-          <Text className="text-sm opacity-90">총 부채</Text>
-          <Heading className="mt-2 text-white">{formatCurrency(totalDebt)}</Heading>
-          <Divider className="my-4 opacity-30" />
-          <div className="grid grid-cols-2 gap-4">
+      <div className="-mt-4 px-4">
+        <div className="rounded-lg bg-white p-6 shadow-lg dark:bg-gray-900">
+          <Text className="text-sm text-gray-600 dark:text-gray-400">총 부채</Text>
+          <Heading className="mt-2 text-red-600 dark:text-red-400">{formatCurrency(totalDebt)}</Heading>
+          <Divider className="my-4" />
+          <div className="grid grid-cols-3 gap-4">
             <div>
-              <Text className="text-xs opacity-75">월 상환액</Text>
+              <Text className="text-xs text-gray-600 dark:text-gray-400">월 상환액</Text>
               <Text className="mt-1 font-semibold">{formatCurrency(monthlyPayment)}</Text>
             </div>
             <div>
-              <Text className="text-xs opacity-75">평균 금리</Text>
+              <Text className="text-xs text-gray-600 dark:text-gray-400">평균 금리</Text>
               <Text className="mt-1 font-semibold">{averageInterestRate}%</Text>
+            </div>
+            <div>
+              <Text className="text-xs text-gray-600 dark:text-gray-400">DTI 비율</Text>
+              <Text className="mt-1 font-semibold">{debtToIncomeRatio}%</Text>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Debt Breakdown */}
+      {/* Debt Breakdown Chart */}
+      <div className="mt-6 px-4">
+        <div className="rounded-lg bg-white p-6 shadow-sm dark:bg-gray-900">
+          <Heading level={3} className="mb-4">
+            부채 구성
+          </Heading>
+          <DebtDonutChart 
+            data={breakdown} 
+            centerText="총 부채"
+            centerValue={`${Math.round(totalDebt / 1000000)}백만`}
+          />
+        </div>
+      </div>
+
+      {/* AI Insight */}
+      <div className="mt-6 px-4">
+        <div className="rounded-lg bg-gradient-to-br from-blue-50 to-indigo-50 p-4 dark:from-blue-950/20 dark:to-indigo-950/20">
+          <div className="flex items-start space-x-3">
+            <div className="flex-shrink-0 rounded-full bg-blue-100 p-2 dark:bg-blue-900/50">
+              <Text className="text-xl">🤖</Text>
+            </div>
+            <div className="flex-1">
+              <Heading level={4} className="text-blue-900 dark:text-blue-400">
+                AI 분석 결과
+              </Heading>
+              <Text className="mt-2 text-sm text-blue-800 dark:text-blue-300">
+                {aiInsight}
+              </Text>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Recommendations */}
       <div className="mt-6 px-4">
         <Heading level={3} className="mb-3">
-          부채 상세 ({debts.length}건)
+          💡 맞춤 추천사항 ({recommendations.length}개)
         </Heading>
         <div className="space-y-3">
-          {debts.map((debt) => (
+          {recommendations.map((rec) => (
+            <div
+              key={rec.id}
+              className={`rounded-lg p-4 shadow-sm ${
+                rec.priority === 'high'
+                  ? 'border-2 border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/20'
+                  : rec.priority === 'medium'
+                  ? 'bg-yellow-50 dark:bg-yellow-950/20'
+                  : 'bg-green-50 dark:bg-green-950/20'
+              }`}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-2">
+                    <Text className="font-semibold">{rec.title}</Text>
+                    <Badge 
+                      color={
+                        rec.priority === 'high' ? 'red' : 
+                        rec.priority === 'medium' ? 'yellow' : 
+                        'green'
+                      }
+                    >
+                      {rec.priority === 'high' ? '긴급' : 
+                       rec.priority === 'medium' ? '권장' : 
+                       '참고'}
+                    </Badge>
+                  </div>
+                  <Text className="mt-2 text-sm text-gray-700 dark:text-gray-300">
+                    {rec.description}
+                  </Text>
+                  <div className="mt-3 flex items-center justify-between">
+                    <Text className="text-xs text-gray-600 dark:text-gray-400">
+                      예상 절감액
+                    </Text>
+                    <Text className="font-bold text-green-600 dark:text-green-400">
+                      연간 {formatCurrency(rec.potentialSavings)}
+                    </Text>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* REMOVED old Debt Breakdown section */}
+      <div className="mt-6 px-4 hidden">
+        <Heading level={3} className="mb-3">
+          부채 상세 (OLD - REMOVED)
+        </Heading>
+        <div className="space-y-3">
+          {mockDebtDataOLD.debts && mockDebtDataOLD.debts.map((debt: any) => (
             <div
               key={debt.id}
               className="rounded-lg bg-white p-4 shadow-sm dark:bg-gray-900"
@@ -213,84 +332,34 @@ export default function DebtAnalysisPage() {
         </div>
       </div>
 
-      {/* AI Insights */}
-      <div className="mt-6 px-4">
-        <Heading level={3} className="mb-3">
-          💡 AI 부채 감소 제안
-        </Heading>
-        <div className="space-y-3">
-          {insights.map((insight) => (
-            <div
-              key={insight.id}
-              className={`rounded-lg p-4 ${
-                insight.type === 'optimization'
-                  ? 'bg-blue-50 dark:bg-blue-950/20'
-                  : 'bg-green-50 dark:bg-green-950/20'
-              }`}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <Text
-                    className={`font-semibold ${
-                      insight.type === 'optimization'
-                        ? 'text-blue-900 dark:text-blue-400'
-                        : 'text-green-900 dark:text-green-400'
-                    }`}
-                  >
-                    {insight.title}
-                  </Text>
-                  <Text
-                    className={`mt-1 text-sm ${
-                      insight.type === 'optimization'
-                        ? 'text-blue-800 dark:text-blue-300'
-                        : 'text-green-800 dark:text-green-300'
-                    }`}
-                  >
-                    {insight.description}
-                  </Text>
-                  <div className="mt-3 flex items-center space-x-2">
-                    <Badge color={insight.type === 'optimization' ? 'blue' : 'green'}>
-                      연간 절감액
-                    </Badge>
-                    <Text className="font-semibold text-green-600 dark:text-green-400">
-                      {formatCurrency(insight.savingsAmount)}
-                    </Text>
-                  </div>
-                </div>
-              </div>
-              <Button className="mt-3 w-full" outline>
-                자세히 보기
-              </Button>
-            </div>
-          ))}
-        </div>
-      </div>
+      {/* OLD AI Insights - REMOVED (replaced with Recommendations above) */}
 
-      {/* Payoff Scenarios */}
+      {/* Simulation Scenarios */}
       <div className="mt-6 px-4 pb-6">
         <Heading level={3} className="mb-3">
-          상환 시나리오 비교
+          📊 상환 시뮬레이션
         </Heading>
         <div className="space-y-3">
-          {payoffScenarios.map((scenario, index) => (
+          {simulationScenarios.map((scenario, index) => (
             <div
-              key={scenario.name}
-              className={`rounded-lg p-4 ${
-                index === 0
-                  ? 'bg-gray-100 dark:bg-gray-800'
-                  : 'bg-white shadow-sm dark:bg-gray-900'
+              key={scenario.id}
+              className={`cursor-pointer rounded-lg p-4 transition-all ${
+                selectedScenario === index
+                  ? 'border-2 border-blue-500 bg-blue-50 shadow-lg dark:border-blue-400 dark:bg-blue-950/30'
+                  : 'bg-white shadow-sm hover:shadow-md dark:bg-gray-900'
               }`}
+              onClick={() => setSelectedScenario(index)}
             >
               <div className="flex items-center justify-between">
                 <Heading level={4}>{scenario.name}</Heading>
-                {scenario.savings && (
-                  <Badge color="green">-{formatCurrency(scenario.savings)}</Badge>
+                {selectedScenario === index && (
+                  <Badge color="blue">선택됨</Badge>
                 )}
               </div>
               <div className="mt-3 grid grid-cols-3 gap-3 text-center">
                 <div>
-                  <Text className="text-xs text-gray-600 dark:text-gray-400">상환기간</Text>
-                  <Text className="mt-1 font-semibold">{scenario.months}개월</Text>
+                  <Text className="text-xs text-gray-600 dark:text-gray-400">월 납입액</Text>
+                  <Text className="mt-1 font-semibold">{formatCurrency(scenario.monthlyPayment)}</Text>
                 </div>
                 <div>
                   <Text className="text-xs text-gray-600 dark:text-gray-400">총 이자</Text>
@@ -299,19 +368,21 @@ export default function DebtAnalysisPage() {
                   </Text>
                 </div>
                 <div>
-                  <Text className="text-xs text-gray-600 dark:text-gray-400">총 상환액</Text>
+                  <Text className="text-xs text-gray-600 dark:text-gray-400">상환 기간</Text>
                   <Text className="mt-1 font-semibold">
-                    {formatCurrency(scenario.totalPayment)}
+                    {scenario.payoffMonths}개월
                   </Text>
                 </div>
               </div>
-              {index > 0 && (
-                <Button className="mt-3 w-full" color="blue">
-                  이 계획 시작하기
-                </Button>
-              )}
             </div>
           ))}
+        </div>
+
+        {/* Action Button */}
+        <div className="mt-6">
+          <Button className="w-full" color="blue" href="/policy-recommendation">
+            맞춤 정책 확인하기 →
+          </Button>
         </div>
       </div>
     </div>
