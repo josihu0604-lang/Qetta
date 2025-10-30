@@ -1,17 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
-
-// Mock user data (나중에 데이터베이스로 대체)
-const mockUserProfile = {
-  id: '1',
-  name: '김헤파',
-  email: 'hephaitos@example.com',
-  phone: '010-1234-5678',
-  birthDate: '1990-01-01',
-  createdAt: '2025-01-01T00:00:00Z',
-  updatedAt: '2025-10-30T00:00:00Z',
-}
 
 /**
  * GET /api/user/profile
@@ -23,17 +13,36 @@ export async function GET(request: NextRequest) {
     // const token = request.headers.get('authorization')
     // const userId = extractUserIdFromToken(token)
 
-    // Mock delay (실제 DB 조회 시뮬레이션)
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    // 임시: 첫 번째 사용자 조회
+    const user = await prisma.user.findFirst()
+
+    if (!user) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'User not found',
+        },
+        { status: 404 },
+      )
+    }
 
     return NextResponse.json(
       {
         success: true,
-        data: mockUserProfile,
+        data: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          birthDate: user.birthDate,
+          createdAt: user.createdAt.toISOString(),
+          updatedAt: user.updatedAt.toISOString(),
+        },
       },
       { status: 200 },
     )
   } catch (error) {
+    console.error('Failed to fetch user profile:', error)
     return NextResponse.json(
       {
         success: false,
@@ -66,27 +75,47 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    // Mock delay
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    // TODO: 실제로는 JWT 토큰에서 사용자 ID를 추출
+    // 임시: 첫 번째 사용자 업데이트
+    const user = await prisma.user.findFirst()
 
-    // Mock update
-    const updatedProfile = {
-      ...mockUserProfile,
-      name,
-      phone,
-      birthDate,
-      updatedAt: new Date().toISOString(),
+    if (!user) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'User not found',
+        },
+        { status: 404 },
+      )
     }
+
+    const updatedUser = await prisma.user.update({
+      where: { id: user.id },
+      data: {
+        name,
+        phone,
+        birthDate,
+      },
+    })
 
     return NextResponse.json(
       {
         success: true,
-        data: updatedProfile,
+        data: {
+          id: updatedUser.id,
+          name: updatedUser.name,
+          email: updatedUser.email,
+          phone: updatedUser.phone,
+          birthDate: updatedUser.birthDate,
+          createdAt: updatedUser.createdAt.toISOString(),
+          updatedAt: updatedUser.updatedAt.toISOString(),
+        },
         message: 'Profile updated successfully',
       },
       { status: 200 },
     )
   } catch (error) {
+    console.error('Failed to update user profile:', error)
     return NextResponse.json(
       {
         success: false,

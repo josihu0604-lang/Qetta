@@ -1,52 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
-
-// Mock debts data
-const mockDebts = [
-  {
-    id: '1',
-    userId: '1',
-    accountName: '신한은행 마이너스 통장',
-    type: 'credit_line',
-    totalAmount: 5000000,
-    currentBalance: 3500000,
-    interestRate: 4.5,
-    monthlyPayment: 150000,
-    dueDate: '2025-11-15',
-    startDate: '2024-01-01',
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2025-10-30T00:00:00Z',
-  },
-  {
-    id: '2',
-    userId: '1',
-    accountName: '국민은행 신용대출',
-    type: 'personal_loan',
-    totalAmount: 10000000,
-    currentBalance: 8200000,
-    interestRate: 5.2,
-    monthlyPayment: 250000,
-    dueDate: '2027-12-31',
-    startDate: '2023-06-01',
-    createdAt: '2023-06-01T00:00:00Z',
-    updatedAt: '2025-10-30T00:00:00Z',
-  },
-  {
-    id: '3',
-    userId: '1',
-    accountName: '우리카드 할부',
-    type: 'installment',
-    totalAmount: 1200000,
-    currentBalance: 800000,
-    interestRate: 8.9,
-    monthlyPayment: 200000,
-    dueDate: '2026-02-28',
-    startDate: '2025-10-01',
-    createdAt: '2025-10-01T00:00:00Z',
-    updatedAt: '2025-10-30T00:00:00Z',
-  },
-]
 
 /**
  * GET /api/debts
@@ -55,35 +10,53 @@ const mockDebts = [
 export async function GET(request: NextRequest) {
   try {
     // TODO: JWT 토큰에서 userId 추출
-    // const userId = extractUserIdFromToken(request)
+    // 임시: 첫 번째 사용자
+    const user = await prisma.user.findFirst()
+
+    if (!user) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'User not found',
+        },
+        { status: 404 },
+      )
+    }
 
     // URL 파라미터
     const searchParams = request.nextUrl.searchParams
     const type = searchParams.get('type') // 부채 유형 필터링
 
-    // Mock delay
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    // 부채 조회
+    const debts = await prisma.debt.findMany({
+      where: {
+        userId: user.id,
+        ...(type && { type }),
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    })
 
-    let filteredDebts = mockDebts
-
-    if (type) {
-      filteredDebts = mockDebts.filter((debt) => debt.type === type)
-    }
+    // 통계 계산
+    const totalAmount = debts.reduce((sum, debt) => sum + debt.currentBalance, 0)
+    const averageInterestRate =
+      debts.length > 0 ? debts.reduce((sum, debt) => sum + debt.interestRate, 0) / debts.length : 0
 
     return NextResponse.json(
       {
         success: true,
-        data: filteredDebts,
+        data: debts,
         meta: {
-          total: filteredDebts.length,
-          totalAmount: filteredDebts.reduce((sum, debt) => sum + debt.currentBalance, 0),
-          averageInterestRate:
-            filteredDebts.reduce((sum, debt) => sum + debt.interestRate, 0) / filteredDebts.length,
+          total: debts.length,
+          totalAmount,
+          averageInterestRate: Number(averageInterestRate.toFixed(2)),
         },
       },
       { status: 200 },
     )
   } catch (error) {
+    console.error('Failed to fetch debts:', error)
     return NextResponse.json(
       {
         success: false,
@@ -104,7 +77,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
 
     // 유효성 검증
-    const { accountName, type, totalAmount, interestRate, monthlyPayment, dueDate } = body
+    const { accountName, type, totalAmount, interestRate, monthlyPayment, dueDate, startDate } =
+      body
 
     if (!accountName || !type || !totalAmount) {
       return NextResponse.json(
@@ -116,24 +90,35 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Mock delay
-    await new Promise((resolve) => setTimeout(resolve, 100))
+    // TODO: JWT 토큰에서 userId 추출
+    // 임시: 첫 번째 사용자
+    const user = await prisma.user.findFirst()
 
-    // Mock 새 부채 생성
-    const newDebt = {
-      id: String(mockDebts.length + 1),
-      userId: '1',
-      accountName,
-      type,
-      totalAmount,
-      currentBalance: totalAmount,
-      interestRate,
-      monthlyPayment,
-      dueDate,
-      startDate: new Date().toISOString().split('T')[0],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+    if (!user) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'User not found',
+        },
+        { status: 404 },
+      )
     }
+
+    // 새 부채 생성
+    const newDebt = await prisma.debt.create({
+      data: {
+        userId: user.id,
+        accountName,
+        type,
+        totalAmount,
+        currentBalance: totalAmount,
+        interestRate,
+        monthlyPayment,
+        dueDate: dueDate || null,
+        startDate: startDate || new Date().toISOString().split('T')[0],
+        status: 'active',
+      },
+    })
 
     return NextResponse.json(
       {
@@ -144,6 +129,7 @@ export async function POST(request: NextRequest) {
       { status: 201 },
     )
   } catch (error) {
+    console.error('Failed to add debt:', error)
     return NextResponse.json(
       {
         success: false,

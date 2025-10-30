@@ -1,0 +1,221 @@
+// Prisma Schema for Hephaitos Mobile
+// Database: SQLite (Development)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// User Model
+// ============================================
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  phone     String?
+  birthDate String?
+  password  String? // Hashed password (optional, for OAuth users)
+  
+  // OAuth fields
+  oauthProvider String? // google, kakao, naver
+  oauthId       String?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  debts           Debt[]
+  accounts        Account[]
+  recommendations Recommendation[]
+  
+  @@index([email])
+}
+
+// ============================================
+// Account Model (연동 계정)
+// ============================================
+model Account {
+  id           String  @id @default(cuid())
+  userId       String
+  provider     String // bank, card, fintech
+  providerName String // "신한은행", "국민카드"
+  accountName  String // "입출금통장", "체크카드"
+  accountNumber String?
+  isActive     Boolean @default(true)
+  
+  // Sync data
+  lastSyncedAt DateTime?
+  syncStatus   String   @default("pending") // pending, synced, failed
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  debts Debt[]
+  
+  @@index([userId])
+  @@index([provider])
+}
+
+// ============================================
+// Debt Model (부채)
+// ============================================
+model Debt {
+  id             String  @id @default(cuid())
+  userId         String
+  accountId      String?
+  accountName    String
+  type           String // personal_loan, credit_line, installment, mortgage, student_loan
+  category       String? // education, housing, consumer, business
+  
+  // Financial details
+  totalAmount    Float
+  currentBalance Float
+  interestRate   Float
+  monthlyPayment Float
+  
+  // Dates
+  startDate String
+  dueDate   String?
+  
+  // Status
+  status String @default("active") // active, paid_off, defaulted
+  
+  // Additional info
+  lenderName String?
+  notes      String?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account Account?  @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  history DebtHistory[]
+  
+  @@index([userId])
+  @@index([type])
+  @@index([status])
+}
+
+// ============================================
+// DebtHistory Model (부채 변동 이력)
+// ============================================
+model DebtHistory {
+  id        String   @id @default(cuid())
+  debtId    String
+  balance   Float
+  payment   Float?
+  interest  Float?
+  principal Float?
+  note      String?
+  
+  // Timestamps
+  recordedAt DateTime @default(now())
+  
+  // Relations
+  debt Debt @relation(fields: [debtId], references: [id], onDelete: Cascade)
+  
+  @@index([debtId])
+  @@index([recordedAt])
+}
+
+// ============================================
+// Policy Model (정책 정보)
+// ============================================
+model Policy {
+  id          String  @id @default(cuid())
+  title       String
+  category    String // loan_refinance, emergency_loan, housing_support, debt_adjustment
+  provider    String
+  description String
+  
+  // Target audience
+  targetAudience String
+  
+  // Benefits
+  benefits String // JSON array as string
+  
+  // Eligibility
+  eligibilityCreditScore String?
+  eligibilityIncome      String?
+  eligibilityAge         String?
+  eligibilityOther       String?
+  
+  // Application
+  applicationProcess String // JSON array as string
+  applicationUrl     String?
+  applicationPhone   String?
+  applicationDeadline String?
+  
+  // Metadata
+  tags              String // JSON array as string
+  estimatedSaving   Float?
+  isActive          Boolean @default(true)
+  viewCount         Int     @default(0)
+  applicationCount  Int     @default(0)
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  recommendations Recommendation[]
+  
+  @@index([category])
+  @@index([isActive])
+}
+
+// ============================================
+// Recommendation Model (추천 이력)
+// ============================================
+model Recommendation {
+  id         String  @id @default(cuid())
+  userId     String
+  policyId   String
+  matchScore Int // 0-100
+  reason     String?
+  status     String  @default("pending") // pending, viewed, applied, rejected
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  policy Policy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([policyId])
+  @@index([status])
+}
+
+// ============================================
+// Session Model (for authentication)
+// ============================================
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  
+  // Device info
+  userAgent String?
+  ipAddress String?
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  
+  @@index([userId])
+  @@index([token])
+  @@index([expiresAt])
+}
