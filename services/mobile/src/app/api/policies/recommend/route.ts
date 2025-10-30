@@ -1,16 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireAuth, createAuthError } from '@/lib/auth/session'
 
 export const dynamic = 'force-dynamic'
 
 /**
  * GET /api/policies/recommend
  * 사용자 맞춤 정책 추천
+ * @requires Authentication
  */
 export async function GET(request: NextRequest) {
   try {
-    // TODO: JWT 토큰에서 userId 추출
-    // TODO: 사용자 프로필 및 부채 데이터 기반 AI 추천
+    // Require authentication
+    const sessionUser = await requireAuth()
+
+    // TODO: 사용자 프로필 및 부채 데이터 기반 AI 추천 알고리즘 개선
 
     // 모든 활성 정책 조회
     const policies = await prisma.policy.findMany({
@@ -77,6 +81,11 @@ export async function GET(request: NextRequest) {
       { status: 200 },
     )
   } catch (error) {
+    // Handle authentication errors
+    if (error instanceof Error && error.message.includes('Unauthorized')) {
+      return createAuthError(error.message)
+    }
+
     console.error('Failed to fetch policy recommendations:', error)
     return NextResponse.json(
       {

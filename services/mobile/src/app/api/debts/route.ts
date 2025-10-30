@@ -1,27 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireAuth, createAuthError } from '@/lib/auth/session'
 
 export const dynamic = 'force-dynamic'
 
 /**
  * GET /api/debts
  * 사용자의 모든 부채 목록 조회
+ * @requires Authentication
  */
 export async function GET(request: NextRequest) {
   try {
-    // TODO: JWT 토큰에서 userId 추출
-    // 임시: 첫 번째 사용자
-    const user = await prisma.user.findFirst()
-
-    if (!user) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'User not found',
-        },
-        { status: 404 },
-      )
-    }
+    // Require authentication
+    const sessionUser = await requireAuth()
 
     // URL 파라미터
     const searchParams = request.nextUrl.searchParams
@@ -30,7 +21,7 @@ export async function GET(request: NextRequest) {
     // 부채 조회
     const debts = await prisma.debt.findMany({
       where: {
-        userId: user.id,
+        userId: sessionUser.id,
         ...(type && { type }),
       },
       orderBy: {
@@ -56,6 +47,11 @@ export async function GET(request: NextRequest) {
       { status: 200 },
     )
   } catch (error) {
+    // Handle authentication errors
+    if (error instanceof Error && error.message.includes('Unauthorized')) {
+      return createAuthError(error.message)
+    }
+
     console.error('Failed to fetch debts:', error)
     return NextResponse.json(
       {
@@ -71,9 +67,13 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/debts
  * 새로운 부채 추가
+ * @requires Authentication
  */
 export async function POST(request: NextRequest) {
   try {
+    // Require authentication
+    const sessionUser = await requireAuth()
+
     const body = await request.json()
 
     // 유효성 검증
@@ -90,24 +90,10 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // TODO: JWT 토큰에서 userId 추출
-    // 임시: 첫 번째 사용자
-    const user = await prisma.user.findFirst()
-
-    if (!user) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'User not found',
-        },
-        { status: 404 },
-      )
-    }
-
     // 새 부채 생성
     const newDebt = await prisma.debt.create({
       data: {
-        userId: user.id,
+        userId: sessionUser.id,
         accountName,
         type,
         totalAmount,
@@ -129,6 +115,11 @@ export async function POST(request: NextRequest) {
       { status: 201 },
     )
   } catch (error) {
+    // Handle authentication errors
+    if (error instanceof Error && error.message.includes('Unauthorized')) {
+      return createAuthError(error.message)
+    }
+
     console.error('Failed to add debt:', error)
     return NextResponse.json(
       {

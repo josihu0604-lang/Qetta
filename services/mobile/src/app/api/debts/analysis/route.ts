@@ -1,32 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireAuth, createAuthError } from '@/lib/auth/session'
 
 export const dynamic = 'force-dynamic'
 
 /**
  * GET /api/debts/analysis
  * 부채 분석 데이터 조회
+ * @requires Authentication
  */
 export async function GET(request: NextRequest) {
   try {
-    // TODO: JWT 토큰에서 userId 추출
-    // 임시: 첫 번째 사용자
-    const user = await prisma.user.findFirst()
-
-    if (!user) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'User not found',
-        },
-        { status: 404 },
-      )
-    }
+    // Require authentication
+    const sessionUser = await requireAuth()
 
     // 모든 부채 조회
     const debts = await prisma.debt.findMany({
       where: {
-        userId: user.id,
+        userId: sessionUser.id,
         status: 'active',
       },
     })
@@ -179,6 +170,11 @@ export async function GET(request: NextRequest) {
       { status: 200 },
     )
   } catch (error) {
+    // Handle authentication errors
+    if (error instanceof Error && error.message.includes('Unauthorized')) {
+      return createAuthError(error.message)
+    }
+
     console.error('Failed to analyze debts:', error)
     return NextResponse.json(
       {

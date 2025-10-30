@@ -11,19 +11,17 @@ datasource db {
 }
 
 // ============================================
-// User Model
+// User Model (NextAuth compatible)
 // ============================================
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String
-  phone     String?
-  birthDate String?
-  password  String? // Hashed password (optional, for OAuth users)
-  
-  // OAuth fields
-  oauthProvider String? // google, kakao, naver
-  oauthId       String?
+  id            String    @id @default(cuid())
+  email         String    @unique
+  emailVerified DateTime?
+  name          String?
+  image         String?
+  phone         String?
+  birthDate     String?
+  password      String? // Hashed password (for credentials provider)
   
   // Timestamps
   createdAt DateTime @default(now())
@@ -31,10 +29,60 @@ model User {
   
   // Relations
   debts           Debt[]
-  accounts        Account[]
+  accounts        OAuthAccount[]
+  bankAccounts    Account[] // Renamed from accounts to avoid conflict
   recommendations Recommendation[]
+  sessions        Session[]
   
   @@index([email])
+}
+
+// ============================================
+// OAuth Account Model (NextAuth required)
+// ============================================
+model OAuthAccount {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+// ============================================
+// Session Model (NextAuth required)
+// ============================================
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+}
+
+// ============================================
+// Verification Token Model (NextAuth required)
+// ============================================
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+  
+  @@unique([identifier, token])
 }
 
 // ============================================
@@ -58,7 +106,7 @@ model Account {
   updatedAt DateTime @updatedAt
   
   // Relations
-  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade, name: "BankAccounts")
   debts Debt[]
   
   @@index([userId])
@@ -98,8 +146,8 @@ model Debt {
   updatedAt DateTime @updatedAt
   
   // Relations
-  user    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  account Account?  @relation(fields: [accountId], references: [id], onDelete: SetNull)
+  user    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account Account?     @relation(fields: [accountId], references: [id], onDelete: SetNull)
   history DebtHistory[]
   
   @@index([userId])
@@ -197,25 +245,4 @@ model Recommendation {
   @@index([userId])
   @@index([policyId])
   @@index([status])
-}
-
-// ============================================
-// Session Model (for authentication)
-// ============================================
-model Session {
-  id        String   @id @default(cuid())
-  userId    String
-  token     String   @unique
-  expiresAt DateTime
-  
-  // Device info
-  userAgent String?
-  ipAddress String?
-  
-  // Timestamps
-  createdAt DateTime @default(now())
-  
-  @@index([userId])
-  @@index([token])
-  @@index([expiresAt])
 }

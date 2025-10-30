@@ -1,20 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireAuth, createAuthError } from '@/lib/auth/session'
 
 export const dynamic = 'force-dynamic'
 
 /**
  * GET /api/user/profile
  * 사용자 프로필 조회
+ * @requires Authentication
  */
 export async function GET(request: NextRequest) {
   try {
-    // TODO: 실제로는 JWT 토큰에서 사용자 ID를 추출해야 함
-    // const token = request.headers.get('authorization')
-    // const userId = extractUserIdFromToken(token)
+    // Require authentication
+    const sessionUser = await requireAuth()
 
-    // 임시: 첫 번째 사용자 조회
-    const user = await prisma.user.findFirst()
+    // Fetch full user data from database
+    const user = await prisma.user.findUnique({
+      where: { id: sessionUser.id },
+    })
 
     if (!user) {
       return NextResponse.json(
@@ -42,6 +45,11 @@ export async function GET(request: NextRequest) {
       { status: 200 },
     )
   } catch (error) {
+    // Handle authentication errors
+    if (error instanceof Error && error.message.includes('Unauthorized')) {
+      return createAuthError(error.message)
+    }
+
     console.error('Failed to fetch user profile:', error)
     return NextResponse.json(
       {
@@ -57,9 +65,13 @@ export async function GET(request: NextRequest) {
 /**
  * PUT /api/user/profile
  * 사용자 프로필 수정
+ * @requires Authentication
  */
 export async function PUT(request: NextRequest) {
   try {
+    // Require authentication
+    const sessionUser = await requireAuth()
+
     const body = await request.json()
 
     // 유효성 검증
@@ -75,22 +87,8 @@ export async function PUT(request: NextRequest) {
       )
     }
 
-    // TODO: 실제로는 JWT 토큰에서 사용자 ID를 추출
-    // 임시: 첫 번째 사용자 업데이트
-    const user = await prisma.user.findFirst()
-
-    if (!user) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'User not found',
-        },
-        { status: 404 },
-      )
-    }
-
     const updatedUser = await prisma.user.update({
-      where: { id: user.id },
+      where: { id: sessionUser.id },
       data: {
         name,
         phone,
@@ -115,6 +113,11 @@ export async function PUT(request: NextRequest) {
       { status: 200 },
     )
   } catch (error) {
+    // Handle authentication errors
+    if (error instanceof Error && error.message.includes('Unauthorized')) {
+      return createAuthError(error.message)
+    }
+
     console.error('Failed to update user profile:', error)
     return NextResponse.json(
       {
